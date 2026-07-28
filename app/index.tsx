@@ -713,7 +713,7 @@ export default function App() {
                             style={[styles.excelCell, styles.grandTotalCell]}
                           >
                             <Text style={styles.grandTotalCellText}>
-                              {rowSum > 0 ? rowSum.toFixed(2) : '-'}
+                              {rowSum > 0 ? rowSum : '-'}
                             </Text>
                           </View>
                         </View>
@@ -752,7 +752,7 @@ export default function App() {
                         <Text
                           style={[styles.summaryValText, { color: '#2980b9' }]}
                         >
-                          {grandTotalSum.toFixed(2)}
+                          {grandTotalSum}
                         </Text>
                       </View>
                     </View>
@@ -828,7 +828,7 @@ export default function App() {
                             },
                           ]}
                         >
-                          {grandTotalNetWeight.toFixed(2)}
+                          {grandTotalNetWeight}
                         </Text>
                       </View>
                     </View>
@@ -874,7 +874,7 @@ export default function App() {
                             },
                           ]}
                         >
-                          {grandTotalWaterWeight.toFixed(2)}
+                          {grandTotalWaterWeight}
                         </Text>
                       </View>
                     </View>
@@ -921,7 +921,7 @@ export default function App() {
                             },
                           ]}
                         >
-                          ${grandTotalFinalPrice.toFixed(2)}
+                          ${grandTotalFinalPrice}
                         </Text>
                       </View>
                     </View>
