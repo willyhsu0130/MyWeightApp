@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { truncateDecimals } from '@/utils/truncateDecimals';
 import type { Batch } from "@/types/weight";
 import {
   Text,
@@ -95,7 +94,7 @@ export default function App() {
   const grandTotalFinalPrice = grandTotalWaterWeight * currentUnitPrice;
 
   const maxRows = Math.max(...batches.map((b) => b.items.length), 0);
-  
+
   const addBatch = () => {
     const newId = Date.now();
     const newBatch: Batch = {
