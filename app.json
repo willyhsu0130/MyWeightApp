@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "willyhsu0130",
     "name": "MyWeightApp",
     "slug": "MyWeightApp",
     "version": "1.0.0",
@@ -11,7 +12,7 @@
     "ios": {
       "supportsTablet": true
     },
-    "android": {
+    "android": { 
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -22,7 +23,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -43,6 +44,18 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b181ceb8-b28d-4528-9cc3-06e3058f4a6c"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b181ceb8-b28d-4528-9cc3-06e3058f4a6c"
     }
   }
 }

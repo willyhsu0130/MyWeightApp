@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { truncateDecimals } from '@/utils/truncateDecimals';
+import type { Batch } from "@/types/weight";
 import {
-  StyleSheet,
   Text,
   View,
   TextInput,
@@ -10,8 +11,9 @@ import {
   Modal,
   SafeAreaView,
   StatusBar,
-  Platform,
   Alert,
+  StyleSheet,
+  Platform,
 } from 'react-native';
 import { Card } from 'react-native-paper';
 
@@ -19,18 +21,9 @@ import { Card } from 'react-native-paper';
 import { exportToSpreadsheet } from '@/utils/exportCSV';
 import { exportToPdf } from '@/utils/exportPDF';
 
-// 1. Types
-export interface BatchItem {
-  id: number;
-  val: number;
-}
+type WeightUnit = 'jin' | 'kg';
 
-export interface Batch {
-  id: number;
-  items: BatchItem[];
-}
-
-// 2. Type-annotated INITIAL_BATCHES
+// Type-annotated INITIAL_BATCHES
 const INITIAL_BATCHES: Batch[] = [
   {
     id: Date.now(),
@@ -42,8 +35,14 @@ export default function App() {
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
   const [activeBatchId, setActiveBatchId] = useState<number>(INITIAL_BATCHES[0].id);
 
+  // Unit State (台斤 vs 公斤)
+  const [unit, setUnit] = useState<WeightUnit>('jin');
+
   const [input, setInput] = useState<string>('');
   const [basketWeight, setBasketWeight] = useState<string>('10');
+  const [waterDeductionFactor, setWaterDeductionFactor] = useState<string>('0.975');
+  const [unitPrice, setUnitPrice] = useState<string>('0');
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editInput, setEditInput] = useState<string>('');
   const [showAllHistory, setShowAllHistory] = useState<boolean>(false);
@@ -62,6 +61,8 @@ export default function App() {
   const [tempFarmer, setTempFarmer] = useState<string>('');
   const [tempOrigin, setTempOrigin] = useState<string>('');
   const [tempDriver, setTempDriver] = useState<string>('');
+  const [tempDeductionFactor, setTempDeductionFactor] = useState<string>('0.975');
+  const [tempUnitPrice, setTempUnitPrice] = useState<string>('0');
 
   // Active Batch Safe Access
   const activeBatchIndex = batches.findIndex((b) => b.id === activeBatchId);
@@ -69,13 +70,19 @@ export default function App() {
   const activeBatch: Batch = batches[safeActiveIndex] || { id: 0, items: [] };
 
   const getBatchName = (index: number) => `批次 ${index + 1}`;
+  const unitLabel = unit === 'jin' ? '斤' : 'kg';
+  const unitTextFull = unit === 'jin' ? '台斤' : '公斤';
+
   const currentBasketWeight = parseFloat(basketWeight) || 0;
+  const currentDeductionFactor = parseFloat(waterDeductionFactor) || 0;
+  const currentUnitPrice = parseFloat(unitPrice) || 0;
 
   // 1. Current Batch Calculations
   const currentSum = activeBatch.items.reduce((acc, curr) => acc + curr.val, 0);
   const currentCount = activeBatch.items.length;
   const currentNetWeight = currentSum - currentCount * currentBasketWeight;
-  const currentPrice = currentNetWeight * 0.975;
+  const currentWaterWeight = currentNetWeight * currentDeductionFactor;
+  const currentFinalPrice = currentWaterWeight * currentUnitPrice;
 
   // 2. Grand Totals
   const grandTotalSum = batches.reduce(
@@ -83,13 +90,12 @@ export default function App() {
     0
   );
   const grandTotalCount = batches.reduce((acc, b) => acc + b.items.length, 0);
-  const grandTotalNetWeight =
-    grandTotalSum - grandTotalCount * currentBasketWeight;
-  const grandTotalPrice = grandTotalNetWeight * 0.975;
+  const grandTotalNetWeight = grandTotalSum - grandTotalCount * currentBasketWeight;
+  const grandTotalWaterWeight = grandTotalNetWeight * currentDeductionFactor;
+  const grandTotalFinalPrice = grandTotalWaterWeight * currentUnitPrice;
 
   const maxRows = Math.max(...batches.map((b) => b.items.length), 0);
-
-  // Handlers
+  
   const addBatch = () => {
     const newId = Date.now();
     const newBatch: Batch = {
@@ -100,6 +106,39 @@ export default function App() {
     setActiveBatchId(newId);
   };
 
+  // --- 刪除批次 Confirmation & Handler ---
+  const confirmDeleteBatch = (batchIdToDelete: number) => {
+    const targetIndex = batches.findIndex((b) => b.id === batchIdToDelete);
+    const batchName = getBatchName(targetIndex !== -1 ? targetIndex : safeActiveIndex);
+
+    Alert.alert(
+      '確認刪除批次',
+      `您確定要刪除「${batchName}」及其所有紀錄嗎？此動作無法復原。`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '刪除',
+          style: 'destructive',
+          onPress: () => {
+            if (batches.length <= 1) {
+              const newId = Date.now();
+              setBatches([{ id: newId, items: [] }]);
+              setActiveBatchId(newId);
+              return;
+            }
+
+            const updatedBatches = batches.filter((b) => b.id !== batchIdToDelete);
+            setBatches(updatedBatches);
+
+            if (activeBatchId === batchIdToDelete) {
+              setActiveBatchId(updatedBatches[0].id);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const addNumber = () => {
     const num = parseFloat(input);
     if (!isNaN(num)) {
@@ -107,9 +146,9 @@ export default function App() {
         prev.map((batch) =>
           batch.id === activeBatchId
             ? {
-                ...batch,
-                items: [...batch.items, { id: Date.now(), val: num }],
-              }
+              ...batch,
+              items: [...batch.items, { id: Date.now(), val: num }],
+            }
             : batch
         )
       );
@@ -124,11 +163,11 @@ export default function App() {
         prev.map((batch) =>
           batch.id === activeBatchId
             ? {
-                ...batch,
-                items: batch.items.map((item) =>
-                  item.id === itemId ? { ...item, val: updatedNum } : item
-                ),
-              }
+              ...batch,
+              items: batch.items.map((item) =>
+                item.id === itemId ? { ...item, val: updatedNum } : item
+              ),
+            }
             : batch
         )
       );
@@ -142,9 +181,9 @@ export default function App() {
       prev.map((batch) =>
         batch.id === activeBatchId
           ? {
-              ...batch,
-              items: batch.items.filter((item) => item.id !== itemId),
-            }
+            ...batch,
+            items: batch.items.filter((item) => item.id !== itemId),
+          }
           : batch
       )
     );
@@ -156,6 +195,8 @@ export default function App() {
     setTempFarmer(exportFarmer);
     setTempOrigin(exportOrigin);
     setTempDriver(exportDriver);
+    setTempDeductionFactor(waterDeductionFactor);
+    setTempUnitPrice(unitPrice);
     setShowExportModal(true);
   };
 
@@ -165,6 +206,8 @@ export default function App() {
     setExportFarmer(tempFarmer);
     setExportOrigin(tempOrigin);
     setExportDriver(tempDriver);
+    setWaterDeductionFactor(tempDeductionFactor);
+    setUnitPrice(tempUnitPrice);
     setShowExportModal(false);
   };
 
@@ -176,6 +219,15 @@ export default function App() {
       origin: exportOrigin,
       driver: exportDriver,
       basketWeight: currentBasketWeight,
+      waterDeductionFactor: currentDeductionFactor,
+      unitPrice: currentUnitPrice,
+      unit: unitTextFull,
+      // Pre-calculated grand totals
+      grandTotalSum,
+      grandTotalCount,
+      grandTotalNetWeight,
+      grandTotalWaterWeight,
+      grandTotalFinalPrice,
     };
 
     Alert.alert(
@@ -183,11 +235,11 @@ export default function App() {
       '請選擇您要產生的報表格式：',
       [
         {
-          text: '📄 PDF 報表 (列印/分享)',
+          text: 'PDF 報表 (列印/分享)',
           onPress: () => exportToPdf(batches, metadata),
         },
         {
-          text: '📊 Excel / CSV 試算表',
+          text: 'Excel / CSV 試算表',
           onPress: () => exportToSpreadsheet(batches, metadata),
         },
         {
@@ -235,15 +287,54 @@ export default function App() {
           {/* 主要作業區 */}
           <View style={styles.mainArea}>
             <Card style={styles.inputCard}>
-              <Text style={styles.heading}>
-                {getBatchName(safeActiveIndex)} - 輸入數值
-              </Text>
+              {/* 單位切換鈕 (台斤 / 公斤) */}
+              <View style={styles.unitToggleContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.unitBtn,
+                    unit === 'jin' && styles.activeUnitBtn,
+                  ]}
+                  onPress={() => setUnit('jin')}
+                >
+                  <Text
+                    style={[
+                      styles.unitBtnText,
+                      unit === 'jin' && styles.activeUnitBtnText,
+                    ]}
+                  >
+                    台斤
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.unitBtn,
+                    unit === 'kg' && styles.activeUnitBtn,
+                  ]}
+                  onPress={() => setUnit('kg')}
+                >
+                  <Text
+                    style={[
+                      styles.unitBtnText,
+                      unit === 'kg' && styles.activeUnitBtnText,
+                    ]}
+                  >
+                    公斤
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={Platform.OS === "ios" ? styles.headingWrapperMobile : styles.headingWrapper}>
+                <Text style={styles.heading}>
+                  {getBatchName(safeActiveIndex)} - 輸入數值
+                </Text>
+
+
+              </View>
 
               {/* 第一行：重量輸入框 + 加入按鈕 */}
               <View style={styles.inputRow}>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="請輸入重量"
+                  placeholder={`請輸入重量 (${unitLabel})`}
                   placeholderTextColor="#7f8c8d"
                   value={input}
                   onChangeText={setInput}
@@ -254,18 +345,50 @@ export default function App() {
                 </View>
               </View>
 
-              {/* 第二行：籃重設定區 */}
-              <View style={styles.basketWeightContainer}>
-                <Text style={styles.basketWeightLabel}>單籃扣重設定 (kg):</Text>
-                <TextInput
-                  style={styles.basketWeightInput}
-                  placeholder="籃重"
-                  placeholderTextColor="#7f8c8d"
-                  value={basketWeight}
-                  onChangeText={setBasketWeight}
-                  keyboardType="numeric"
-                />
+              {/* 第二行：籃重、水重、單價設定區 */}
+              <View style={Platform.OS === "ios" ? styles.settingsContainerMobile : styles.settingsContainer}>
+                <View style={styles.settingItem}>
+                  <Text style={styles.settingLabel}>籃重 ({unitLabel}):</Text>
+                  <TextInput
+                    style={styles.settingInput}
+                    placeholder="籃重"
+                    placeholderTextColor="#7f8c8d"
+                    value={basketWeight}
+                    onChangeText={setBasketWeight}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.settingItem}>
+                  <Text style={styles.settingLabel}>水重:</Text>
+                  <TextInput
+                    style={styles.settingInput}
+                    placeholder="0.975"
+                    placeholderTextColor="#7f8c8d"
+                    value={waterDeductionFactor}
+                    onChangeText={setWaterDeductionFactor}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.settingItem}>
+                  <Text style={styles.settingLabel}>單價 ($/{unitLabel}):</Text>
+                  <TextInput
+                    style={styles.settingInput}
+                    placeholder="單價"
+                    placeholderTextColor="#7f8c8d"
+                    value={unitPrice}
+                    onChangeText={setUnitPrice}
+                    keyboardType="numeric"
+                  />
+                </View>
               </View>
+
+              {/* 第三行：最底部的刪除批次按鈕 */}
+              <TouchableOpacity
+                style={styles.deleteBatchBtn}
+                onPress={() => confirmDeleteBatch(activeBatch.id)}
+              >
+                <Text style={styles.deleteBatchBtnText}>刪除此批次</Text>
+              </TouchableOpacity>
             </Card>
 
             {/* 當前批次統計 */}
@@ -273,46 +396,63 @@ export default function App() {
               當前批次統計 ({getBatchName(safeActiveIndex)})
             </Text>
             <View style={styles.statsContainer}>
-              <Card style={[styles.statBox, { borderLeftColor: '#3498db' }]}>
-                <Text style={styles.statLabel}>總和</Text>
-                <Text style={[styles.statValue, { color: '#2980b9' }]}>
-                  {currentSum.toFixed(2)}
-                </Text>
-              </Card>
+              <View style={styles.statsRow}>
+                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#3498db' }]}>
+                  <Text style={styles.statLabel}>總和 ({unitLabel})</Text>
+                  <Text style={[styles.statValue, { color: '#2980b9' }]}>
+                    {currentSum.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
+                  </Text>
+                </Card>
 
-              <Card style={[styles.statBox, { borderLeftColor: '#9b59b6' }]}>
-                <Text style={styles.statLabel}>籃數 (筆數)</Text>
-                <Text style={[styles.statValue, { color: '#8e44ad' }]}>
-                  {currentCount} <Text style={styles.unitText}>籃</Text>
-                </Text>
-              </Card>
+                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#9b59b6' }]}>
+                  <Text style={styles.statLabel}>籃數 (筆數)</Text>
+                  <Text style={[styles.statValue, { color: '#8e44ad' }]}>
+                    {currentCount} <Text style={styles.unitText}>籃</Text>
+                  </Text>
+                </Card>
+              </View>
 
-              <Card style={[styles.statBox, { borderLeftColor: '#2ecc71' }]}>
+              <View style={styles.statsRow}>
+                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#2ecc71' }]}>
+                  <View style={Platform.OS === "ios" ? styles.labelWithSubMobile : styles.labelWithSub}>
+                    <Text style={styles.statLabel}>淨重 ({unitLabel})</Text>
+                    <Text style={styles.subFormula}>(總和 - 籃數×{currentBasketWeight})</Text>
+                  </View>
+                  <Text style={[styles.statValue, { color: '#27ae60' }]}>
+                    {currentNetWeight.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
+                  </Text>
+                </Card>
+
+                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#e67e22' }]}>
+                  <View style={Platform.OS === "ios" ? styles.labelWithSubMobile : styles.labelWithSub}>
+                    <Text style={styles.statLabel}>已扣水重 ({unitLabel})</Text>
+                    <Text style={styles.subFormula}>(淨重 × {currentDeductionFactor})</Text>
+                  </View>
+                  <Text style={[styles.statValue, { color: '#d35400' }]}>
+                    {currentWaterWeight.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
+                  </Text>
+                </Card>
+              </View>
+
+              {/* 最終總金額卡片 */}
+              <Card style={[styles.statBox, { borderLeftColor: '#f1c40f', backgroundColor: '#fef9e7' }]}>
                 <View style={styles.labelWithSub}>
-                  <Text style={styles.statLabel}>淨重</Text>
-                  <Text style={styles.subFormula}>
-                    (總和 - 籃數×{currentBasketWeight})
+                  <Text style={[styles.statLabel, { color: '#b7950b', fontWeight: 'bold' }]}>
+                    金額 (Final Amount)
+                  </Text>
+                  <Text style={[styles.subFormula, { color: '#d4ac0d' }]}>
+                    (已扣水重 × ${currentUnitPrice})
                   </Text>
                 </View>
-                <Text style={[styles.statValue, { color: '#27ae60' }]}>
-                  {currentNetWeight.toFixed(2)}
-                </Text>
-              </Card>
-
-              <Card style={[styles.statBox, { borderLeftColor: '#e67e22' }]}>
-                <View style={styles.labelWithSub}>
-                  <Text style={styles.statLabel}>金額 (Price)</Text>
-                  <Text style={styles.subFormula}>(淨重 × 0.975)</Text>
-                </View>
-                <Text style={[styles.statValue, { color: '#d35400' }]}>
-                  ${currentPrice.toFixed(2)}
+                <Text style={[styles.statValue, { color: '#b7950b' }]}>
+                  ${currentFinalPrice.toFixed(2)}
                 </Text>
               </Card>
             </View>
 
             {/* 全域總計列 & 匯出按鈕 */}
             <Card style={styles.grandTotalCard}>
-              <Text style={styles.grandTotalTitle}>所有批次總計 (Grand Total)</Text>
+              <Text style={styles.grandTotalTitle}>所有批次總計 (Grand Total) - {unitTextFull}</Text>
 
               {/* 魚資訊預覽 */}
               {exportFarmer || exportOrigin || exportDriver ? (
@@ -325,16 +465,19 @@ export default function App() {
 
               <View style={styles.grandTotalRow}>
                 <Text style={styles.grandTotalText}>
-                  總和: <Text style={styles.bold}>{grandTotalSum.toFixed(2)}</Text>
+                  總和: <Text style={styles.bold}>{grandTotalSum.toFixed(2)} {unitLabel}</Text>
                 </Text>
                 <Text style={styles.grandTotalText}>
-                  總籃數: <Text style={styles.bold}>{grandTotalCount}</Text>
+                  總籃數: <Text style={styles.bold}>{grandTotalCount} 籃</Text>
                 </Text>
                 <Text style={styles.grandTotalText}>
-                  總淨重: <Text style={styles.bold}>{grandTotalNetWeight.toFixed(2)}</Text>
+                  總淨重: <Text style={styles.bold}>{grandTotalNetWeight.toFixed(2)} {unitLabel}</Text>
                 </Text>
                 <Text style={styles.grandTotalText}>
-                  總金額: <Text style={styles.bold}>${grandTotalPrice.toFixed(2)}</Text>
+                  總已扣水重: <Text style={styles.bold}>{grandTotalWaterWeight.toFixed(2)} {unitLabel}</Text>
+                </Text>
+                <Text style={[styles.grandTotalText, { color: '#f1c40f', fontWeight: 'bold' }]}>
+                  總金額: <Text style={styles.bold}>${grandTotalFinalPrice.toFixed(2)}</Text>
                 </Text>
               </View>
 
@@ -367,7 +510,7 @@ export default function App() {
           {/* 右側：當前批次歷史紀錄 */}
           <View style={styles.sidebar}>
             <Text style={styles.historyLabel}>
-              {getBatchName(safeActiveIndex)} 紀錄
+              {getBatchName(safeActiveIndex)} 紀錄 ({unitLabel})
             </Text>
             <ScrollView style={styles.scrollList} showsVerticalScrollIndicator={false}>
               {activeBatch.items.map((item, index) => (
@@ -399,7 +542,7 @@ export default function App() {
                     >
                       <View style={styles.valWithIndex}>
                         <Text style={styles.indexTag}>#{index + 1}</Text>
-                        <Text style={styles.itemText}>{item.val}</Text>
+                        <Text style={styles.itemText}>{item.val} {unitLabel}</Text>
                       </View>
                       <TouchableOpacity onPress={() => removeItem(item.id)}>
                         <Text style={styles.deleteBtn}>✕</Text>
@@ -417,7 +560,7 @@ export default function App() {
           <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
             <View style={styles.modalContainer}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>全區所有批次總明細</Text>
+                <Text style={styles.modalTitle}>全區所有批次總明細 ({unitTextFull})</Text>
                 <Button title="關閉" onPress={() => setShowAllHistory(false)} />
               </View>
 
@@ -444,8 +587,20 @@ export default function App() {
                 </View>
                 <View style={styles.receiptHeaderRow}>
                   <Text style={styles.receiptHeaderText}>
+                    <Text style={styles.receiptLabel}>計量單位：</Text>
+                    {unitTextFull}
+                  </Text>
+                  <Text style={styles.receiptHeaderText}>
                     <Text style={styles.receiptLabel}>容器扣重：</Text>
-                    {currentBasketWeight} kg / 籃
+                    {currentBasketWeight} {unitLabel} / 籃
+                  </Text>
+                  <Text style={styles.receiptHeaderText}>
+                    <Text style={styles.receiptLabel}>水重：</Text>
+                    {currentDeductionFactor}
+                  </Text>
+                  <Text style={styles.receiptHeaderText}>
+                    <Text style={styles.receiptLabel}>單價：</Text>
+                    ${currentUnitPrice} / {unitLabel}
                   </Text>
                 </View>
               </View>
@@ -634,10 +789,10 @@ export default function App() {
                       </View>
                     </View>
 
-                    {/* Summary Row 4: Price */}
+                    {/* Summary Row 4: Water Weight */}
                     <View style={[styles.excelRow, styles.summaryRow]}>
                       <View style={[styles.excelCell, styles.summaryLabelCell]}>
-                        <Text style={styles.summaryLabelText}>金額</Text>
+                        <Text style={styles.summaryLabelText}>水重</Text>
                       </View>
                       {batches.map((b) => {
                         const sum = b.items.reduce(
@@ -645,7 +800,7 @@ export default function App() {
                           0
                         );
                         const net = sum - b.items.length * currentBasketWeight;
-                        const price = net * 0.975;
+                        const waterWeight = net * currentDeductionFactor;
                         return (
                           <View key={b.id} style={styles.excelCell}>
                             <Text
@@ -654,7 +809,7 @@ export default function App() {
                                 { color: '#e67e22' },
                               ]}
                             >
-                              ${price.toFixed(2)}
+                              {waterWeight.toFixed(2)}
                             </Text>
                           </View>
                         );
@@ -675,7 +830,54 @@ export default function App() {
                             },
                           ]}
                         >
-                          ${grandTotalPrice.toFixed(2)}
+                          {grandTotalWaterWeight.toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Summary Row 5: Price */}
+                    <View style={[styles.excelRow, styles.summaryRow]}>
+                      <View style={[styles.excelCell, styles.summaryLabelCell]}>
+                        <Text style={styles.summaryLabelText}>金額</Text>
+                      </View>
+                      {batches.map((b) => {
+                        const sum = b.items.reduce(
+                          (acc, curr) => acc + curr.val,
+                          0
+                        );
+                        const net = sum - b.items.length * currentBasketWeight;
+                        const waterWeight = net * currentDeductionFactor;
+                        const finalPrice = waterWeight * currentUnitPrice;
+                        return (
+                          <View key={b.id} style={styles.excelCell}>
+                            <Text
+                              style={[
+                                styles.summaryValText,
+                                { color: '#b7950b' },
+                              ]}
+                            >
+                              ${finalPrice.toFixed(2)}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                      <View
+                        style={[
+                          styles.excelCell,
+                          styles.grandTotalSummaryCell,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.summaryValText,
+                            {
+                              color: '#b7950b',
+                              fontSize: 13,
+                              fontWeight: '900',
+                            },
+                          ]}
+                        >
+                          ${grandTotalFinalPrice.toFixed(2)}
                         </Text>
                       </View>
                     </View>
@@ -695,30 +897,6 @@ export default function App() {
           <View style={styles.modalOverlay}>
             <View style={styles.exportModalBox}>
               <Text style={styles.exportModalTitle}>填寫出貨魚資訊</Text>
-
-              {/* 報表表頭即時預覽 */}
-              {/* <View style={styles.modalPreviewCard}>
-                <View style={styles.modalPreviewRow}>
-                  <Text style={styles.modalPreviewText}>
-                    <Text style={styles.modalPreviewLabel}>年月日：</Text>
-                    {tempDate || '未填寫'}
-                  </Text>
-                  <Text style={styles.modalPreviewText}>
-                    <Text style={styles.modalPreviewLabel}>養殖戶：</Text>
-                    {tempFarmer || '未填寫'}
-                  </Text>
-                </View>
-                <View style={styles.modalPreviewRow}>
-                  <Text style={styles.modalPreviewText}>
-                    <Text style={styles.modalPreviewLabel}>產地：</Text>
-                    {tempOrigin || '未填寫'}
-                  </Text>
-                  <Text style={styles.modalPreviewText}>
-                    <Text style={styles.modalPreviewLabel}>司機：</Text>
-                    {tempDriver || '未填寫'}
-                  </Text>
-                </View>
-              </View> */}
 
               {/* 輸入表單 */}
               <View style={styles.exportInputGroup}>
@@ -765,6 +943,30 @@ export default function App() {
                 />
               </View>
 
+              <View style={styles.exportInputGroup}>
+                <Text style={styles.exportInputLabel}>水重 :</Text>
+                <TextInput
+                  style={styles.exportTextInput}
+                  placeholder="0.975"
+                  placeholderTextColor="#7f8c8d"
+                  value={tempDeductionFactor}
+                  onChangeText={setTempDeductionFactor}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.exportInputGroup}>
+                <Text style={styles.exportInputLabel}>單價 ($/{unitLabel}) :</Text>
+                <TextInput
+                  style={styles.exportTextInput}
+                  placeholder="請輸入單價"
+                  placeholderTextColor="#7f8c8d"
+                  value={tempUnitPrice}
+                  onChangeText={setTempUnitPrice}
+                  keyboardType="numeric"
+                />
+              </View>
+
               <View style={styles.exportActionRow}>
                 <TouchableOpacity
                   style={[styles.exportModalBtn, styles.cancelBtn]}
@@ -783,8 +985,8 @@ export default function App() {
             </View>
           </View>
         </Modal>
-      </View>
-    </SafeAreaView>
+      </View >
+    </SafeAreaView >
   );
 }
 
@@ -858,11 +1060,63 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     elevation: 1,
   },
+  headingWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  headingWrapperMobile: {
+    flexDirection: 'row',
+    flexWrap: "wrap",
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   heading: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 10,
     color: '#2c3e50',
+  },
+  unitToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f0f3f4',
+    borderRadius: 6,
+    padding: 2,
+    marginBottom: 6
+  },
+  unitBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    flex: 1
+  },
+  activeUnitBtn: {
+    backgroundColor: '#3498db',
+  },
+  unitBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7f8c8d',
+  },
+  activeUnitBtnText: {
+    color: '#ffffff',
+  },
+  deleteBatchBtn: {
+    backgroundColor: '#ffebee',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ffcdd2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  deleteBatchBtnText: {
+    color: '#e53935',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
   sectionTitle: {
     fontSize: 13,
@@ -887,34 +1141,55 @@ const styles = StyleSheet.create({
   addBtnWrapper: {
     width: 65,
   },
-  basketWeightContainer: {
+  settingsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f0f3f4',
+    gap: 4,
   },
-  basketWeightLabel: {
-    fontSize: 13,
+  settingsContainerMobile: {
+    flexDirection: 'row',
+    flexWrap: 'wrap', // Enable wrapping onto new lines
+    alignItems: 'center',
+    justifyContent: 'flex-start', // Keeps wrapped items left-aligned (or 'space-between' if you prefer)
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f3f4',
+    gap: 8, // Controls spacing between wrapped rows & items
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingLabel: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#7f8c8d',
-    marginRight: 8,
+    marginRight: 4,
   },
-  basketWeightInput: {
+  settingInput: {
     borderWidth: 1,
     borderColor: '#bdc3c7',
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    fontSize: 14,
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    fontSize: 13,
     backgroundColor: '#fff',
     textAlign: 'center',
-    width: 75,
+    width: 55,
   },
   statsContainer: {
     gap: 8,
     marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   statBox: {
     padding: 10,
@@ -924,6 +1199,12 @@ const styles = StyleSheet.create({
   },
   labelWithSub: {
     flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  labelWithSubMobile: {
+    flexDirection: 'row',
+    flexWrap: "wrap",
     alignItems: 'baseline',
     justifyContent: 'space-between',
   },
@@ -937,7 +1218,7 @@ const styles = StyleSheet.create({
     color: '#bdc3c7',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginTop: 2,
   },
@@ -1237,43 +1518,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  modalPreviewCard: {
-    backgroundColor: '#eef2f3',
-    borderWidth: 1,
-    borderColor: '#bdc3c7',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 16,
-  },
-  modalPreviewTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#7f8c8d',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  modalPreviewRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  modalPreviewText: {
-    fontSize: 12,
-    color: '#2c3e50',
-    flex: 1,
-  },
-  modalPreviewLabel: {
-    fontWeight: 'bold',
-    color: '#34495e',
-  },
   exportInputGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
   exportInputLabel: {
-    width: 70,
-    fontSize: 14,
+    width: 100,
+    fontSize: 13,
     fontWeight: '600',
     color: '#34495e',
   },

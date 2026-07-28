@@ -18,6 +18,14 @@ export interface ExportMetadata {
   origin: string;
   driver: string;
   basketWeight: number;
+  waterDeductionFactor: number;
+  unitPrice: number;
+  unit: string; // '台斤' | '公斤'
+  grandTotalSum: number;
+  grandTotalCount: number;
+  grandTotalNetWeight: number;
+  grandTotalWaterWeight: number;
+  grandTotalFinalPrice: number;
 }
 
 export const exportToPdf = async (
@@ -30,80 +38,113 @@ export const exportToPdf = async (
   }
 
   const numBatches = batches.length;
+  // Always render at least 25 rows to match physical sheet height
   const maxRows = Math.max(25, ...batches.map((b) => b.items.length));
+  const unitLabel = meta.unit === '台斤' ? '台斤' : '公斤';
 
-  // 1. Calculations
-  const grandTotalSum = batches.reduce(
-    (acc, b) => acc + b.items.reduce((iAcc, item) => iAcc + item.val, 0),
-    0
-  );
-  const grandTotalCount = batches.reduce((acc, b) => acc + b.items.length, 0);
-  const grandTotalNetWeight = grandTotalSum - grandTotalCount * meta.basketWeight;
-  const grandTotalPrice = grandTotalNetWeight * 0.975;
-
-  // 2. Generate Table Column Headers (1, 2, 3...)
+  // 1. Column Headers (Batch 1, 2, 3...)
   const columnHeadersHtml = Array.from(
     { length: numBatches },
-    (_, i) => `<th style="width: 10%; border: 1px solid #000; padding: 4px;">${i + 1}</th>`
+    (_, i) => `<th style="border: 1px solid #000; padding: 4px;">${i + 1}</th>`
   ).join('');
 
-  // 3. Generate Data Rows (1 to 25+)
+  // 2. Grid Rows (1 to 25+) - Without Remarks Column
   let dataRowsHtml = '';
   for (let r = 0; r < maxRows; r++) {
     const cellsHtml = batches
       .map(
         (b) =>
-          `<td style="border: 1px solid #000; text-align: center; height: 22px;">${
+          `<td style="border: 1px solid #000; text-align: center; height: 22px; font-size: 13px;">${
             b.items[r] ? b.items[r].val : ''
           }</td>`
       )
       .join('');
 
-    // Attach right-side paper remarks
-    let remark = '';
-    if (r === 0) remark = `※容器扣重 ${meta.basketWeight} 台斤`;
-    if (r === 9) remark = '公斤 / 已扣重';
-
     dataRowsHtml += `
       <tr>
-        <td style="border: 1px solid #000; text-align: center; font-weight: bold; width: 30px;">${r + 1}</td>
+        <td style="border: 1px solid #000; text-align: center; font-weight: bold; width: 32px; font-size: 11px;">${r + 1}</td>
         ${cellsHtml}
-        <td style="border: 1px solid #000; text-align: center; font-size: 11px;">${remark}</td>
       </tr>
     `;
   }
 
-  // 4. Generate Subtotal Row (小計)
+  // 3. Subtotal Row (小計)
   const subtotalsHtml = batches
     .map((b) => {
       const sum = b.items.reduce((acc, curr) => acc + curr.val, 0);
-      return `<td style="border: 1px solid #000; text-align: center; font-weight: bold;">${sum > 0 ? sum.toFixed(1) : ''}</td>`;
+      return `<td style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 12px;">${sum > 0 ? sum.toFixed(1) : ''}</td>`;
     })
     .join('');
 
-  // 5. HTML Template with Final Price Included
+  // 4. HTML Document Structure
   const htmlContent = `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="utf-8" />
         <style>
-          body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #000; }
-          .title { text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 12px; }
-          .meta-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 10px; font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-          th, td { font-size: 12px; }
-          .subtotal-label { font-weight: bold; text-align: center; width: 30px; border: 1px solid #000; }
+          @page { margin: 10mm; }
+          body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            padding: 10px; 
+            color: #000; 
+            background: #fff;
+          }
+          .header-title { 
+            text-align: center; 
+            font-size: 26px; 
+            font-weight: bold; 
+            letter-spacing: 2px;
+            margin-bottom: 8px; 
+          }
+          .meta-row { 
+            display: flex; 
+            justify-content: space-between; 
+            font-size: 13px; 
+            margin-bottom: 8px; 
+            font-weight: bold; 
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+          }
+          th { 
+            border: 1px solid #000; 
+            font-size: 13px;
+          }
+          .subtotal-label { 
+            font-weight: bold; 
+            text-align: center; 
+            width: 32px; 
+            border: 1px solid #000; 
+            font-size: 11px;
+          }
           
-          /* Summary Footer Section */
-          .summary-container { margin-top: 15px; border: 1.5px solid #000; padding: 12px; font-size: 13px; }
-          .summary-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
-          .summary-row:last-child { margin-bottom: 0; }
-          .price-highlight { font-size: 16px; font-weight: bold; color: #000; border-top: 1px dashed #000; padding-top: 6px; margin-top: 6px; }
+          /* Summary Footer Card */
+          .summary-card { 
+            margin-top: 12px; 
+            border: 1.5px solid #000; 
+            padding: 10px 14px; 
+            font-size: 12px; 
+          }
+          .summary-grid { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 4px; 
+          }
+          .price-row { 
+            display: flex; 
+            justify-content: space-between; 
+            font-size: 15px; 
+            font-weight: bold; 
+            border-top: 1px dashed #000; 
+            padding-top: 6px; 
+            margin-top: 6px; 
+          }
         </style>
       </head>
       <body>
-        <div class="title">晁欣漁產有限公司</div>
+        <div class="header-title">晁欣漁產有限公司</div>
         
         <div class="meta-row">
           <span>日期：${meta.date || '___年 __月 __日'}</span>
@@ -115,9 +156,8 @@ export const exportToPdf = async (
         <table>
           <thead>
             <tr>
-              <th style="width: 30px; border: 1px solid #000;">#</th>
+              <th style="width: 32px; border: 1px solid #000;">#</th>
               ${columnHeadersHtml}
-              <th style="border: 1px solid #000; width: 110px;">備註</th>
             </tr>
           </thead>
           <tbody>
@@ -125,25 +165,25 @@ export const exportToPdf = async (
             <tr>
               <td class="subtotal-label">小計</td>
               ${subtotalsHtml}
-              <td style="border: 1px solid #000;"></td>
             </tr>
           </tbody>
         </table>
 
-        <!-- Total Calculation Box with Price -->
-        <div class="summary-container">
-          <div class="summary-row">
-            <span><b>總和 (Sum):</b> ${grandTotalSum.toFixed(2)}</span>
-            <span><b>總籃數 (Baskets):</b> ${grandTotalCount} 籃</span>
-            <span><b>單籃扣重:</b> ${meta.basketWeight} kg</span>
+        <!-- Summary Section -->
+        <div class="summary-card">
+          <div class="summary-grid">
+            <span><b>總和:</b> ${meta.grandTotalSum.toFixed(2)} ${unitLabel}</span>
+            <span><b>總籃數:</b> ${meta.grandTotalCount} 籃</span>
+            <span><b>容器扣重:</b> ${meta.basketWeight} ${unitLabel}/籃</span>
           </div>
-          <div class="summary-row">
-            <span><b>總淨重 (Net Weight):</b> ${grandTotalNetWeight.toFixed(2)} kg</span>
-            <span><b>折價比率:</b> 0.975</span>
+          <div class="summary-grid">
+            <span><b>淨重:</b> ${meta.grandTotalNetWeight.toFixed(2)} ${unitLabel}</span>
+            <span><b>水重折算:</b> ${meta.waterDeductionFactor} (${meta.grandTotalWaterWeight.toFixed(2)} ${unitLabel})</span>
+            <span><b>單價:</b> $${meta.unitPrice} / ${unitLabel}</span>
           </div>
-          <div class="summary-row price-highlight">
-            <span><b>總金額 (Final Price):</b></span>
-            <span><b>$${grandTotalPrice.toFixed(2)}</b></span>
+          <div class="price-row">
+            <span>總金額 (Final Price):</span>
+            <span>$${meta.grandTotalFinalPrice.toFixed(2)}</span>
           </div>
         </div>
       </body>
