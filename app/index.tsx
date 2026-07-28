@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { Batch } from "@/types/weight";
 import {
   Text,
@@ -31,6 +31,8 @@ const INITIAL_BATCHES: Batch[] = [
 ];
 
 export default function App() {
+  const weightInputRef = useRef<TextInput>(null);
+
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
   const [activeBatchId, setActiveBatchId] = useState<number>(INITIAL_BATCHES[0].id);
 
@@ -94,6 +96,11 @@ export default function App() {
   const grandTotalFinalPrice = grandTotalWaterWeight * currentUnitPrice;
 
   const maxRows = Math.max(...batches.map((b) => b.items.length), 0);
+  const focusWeightInput = () => {
+    setTimeout(() => {
+      weightInputRef.current?.focus();
+    }, 50);
+  };
 
   const addBatch = () => {
     const newId = Date.now();
@@ -103,6 +110,7 @@ export default function App() {
     };
     setBatches([...batches, newBatch]);
     setActiveBatchId(newId);
+    focusWeightInput()
   };
 
   // --- 刪除批次 Confirmation & Handler ---
@@ -153,6 +161,7 @@ export default function App() {
       );
       setInput('');
     }
+    focusWeightInput()
   };
 
   const saveEdit = (itemId: number) => {
@@ -332,12 +341,14 @@ export default function App() {
               {/* 第一行：重量輸入框 + 加入按鈕 */}
               <View style={styles.inputRow}>
                 <TextInput
+                  ref={weightInputRef}
                   style={styles.textInput}
                   placeholder={`請輸入重量 (${unitLabel})`}
                   placeholderTextColor="#7f8c8d"
                   value={input}
                   onChangeText={setInput}
                   keyboardType="numeric"
+                  onSubmitEditing={addNumber}
                 />
                 <View style={styles.addBtnWrapper}>
                   <Button title="加入" onPress={addNumber} />
