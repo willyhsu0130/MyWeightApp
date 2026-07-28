@@ -1,21 +1,20 @@
-import React, { useRef, useState } from 'react';
 import type { Batch } from "@/types/weight";
+import React, { useRef, useState } from 'react';
 import {
-  Text,
-  View,
-  TextInput,
-  Button,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  SafeAreaView,
-  StatusBar,
   Alert,
-  StyleSheet,
+  Button,
+  Modal,
   Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Card } from 'react-native-paper';
-import { truncateDecimals } from '@/utils/truncateDecimals';
 // Native File System & Sharing
 import { exportToSpreadsheet } from '@/utils/exportCSV';
 import { exportToPdf } from '@/utils/exportPDF';
@@ -95,8 +94,8 @@ export default function App() {
   const grandTotalNetWeight = grandTotalSum - grandTotalCount * currentBasketWeight;
 
   // Truncate grand total water weight to 2 decimal places without rounding up
-  const grandTotalWaterWeight = truncateDecimals(grandTotalNetWeight * currentDeductionFactor, 2);
-  const grandTotalFinalPrice = grandTotalWaterWeight * currentUnitPrice;
+  const grandTotalWaterWeight = Math.trunc(grandTotalNetWeight * currentDeductionFactor);
+  const grandTotalFinalPrice = Math.trunc(grandTotalWaterWeight * currentUnitPrice);
 
   const maxRows = Math.max(...batches.map((b) => b.items.length), 0);
   const focusWeightInput = () => {
@@ -245,7 +244,7 @@ export default function App() {
       grandTotalSum,
       grandTotalCount,
       grandTotalNetWeight,
-      grandTotalWaterWeight,
+      grandTotalWaterWeight: Math.floor(grandTotalWaterWeight),
       grandTotalFinalPrice,
     };
 
@@ -493,19 +492,19 @@ export default function App() {
 
                   <View style={styles.grandTotalRow}>
                     <Text style={styles.grandTotalText}>
-                      總和: <Text style={styles.bold}>{grandTotalSum.toFixed(2)} {unitLabel}</Text>
+                      總和: <Text style={styles.bold}>{grandTotalSum} {unitLabel}</Text>
                     </Text>
                     <Text style={styles.grandTotalText}>
                       總籃數: <Text style={styles.bold}>{grandTotalCount} 籃</Text>
                     </Text>
                     <Text style={styles.grandTotalText}>
-                      總淨重: <Text style={styles.bold}>{grandTotalNetWeight.toFixed(2)} {unitLabel}</Text>
+                      總淨重: <Text style={styles.bold}>{grandTotalNetWeight} {unitLabel}</Text>
                     </Text>
                     <Text style={styles.grandTotalText}>
-                      總已扣水重: <Text style={styles.bold}>{grandTotalWaterWeight.toFixed(0)} {unitLabel}</Text>
+                      總已扣水重: <Text style={styles.bold}>{grandTotalWaterWeight} {unitLabel}</Text>
                     </Text>
                     <Text style={[styles.grandTotalText, { color: '#f1c40f', fontWeight: 'bold' }]}>
-                      總金額: <Text style={styles.bold}>${grandTotalFinalPrice.toFixed(2)}</Text>
+                      總金額: <Text style={styles.bold}>${grandTotalFinalPrice}</Text>
                     </Text>
                   </View>
                 </View>

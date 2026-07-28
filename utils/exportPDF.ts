@@ -24,7 +24,7 @@ export interface ExportMetadata {
   grandTotalSum: number;
   grandTotalCount: number;
   grandTotalNetWeight: number;
-  grandTotalWaterWeight: number;
+  grandTotalWaterWeight: number; // Final Weight after Water Deduction
   grandTotalFinalPrice: number;
 }
 
@@ -54,8 +54,7 @@ export const exportToPdf = async (
     const cellsHtml = batches
       .map(
         (b) =>
-          `<td style="border: 1px solid #000; text-align: center; height: 22px; font-size: 13px;">${
-            b.items[r] ? b.items[r].val : ''
+          `<td style="border: 1px solid #000; text-align: center; height: 22px; font-size: 13px;">${b.items[r] ? b.items[r].val : ''
           }</td>`
       )
       .join('');
@@ -173,18 +172,22 @@ export const exportToPdf = async (
         <!-- Summary Section -->
         <div class="summary-card">
           <div class="summary-grid">
-            <span><b>總和:</b> ${meta.grandTotalSum.toFixed(2)} ${unitLabel}</span>
+            <span><b>總和:</b> ${meta.grandTotalSum} ${unitLabel}</span>
             <span><b>總籃數:</b> ${meta.grandTotalCount} 籃</span>
             <span><b>容器扣重:</b> ${meta.basketWeight} ${unitLabel}/籃</span>
           </div>
           <div class="summary-grid">
-            <span><b>淨重:</b> ${meta.grandTotalNetWeight.toFixed(2)} ${unitLabel}</span>
-            <span><b>水重折算:</b> ${meta.waterDeductionFactor} (${meta.grandTotalWaterWeight.toFixed(2)} ${unitLabel})</span>
+            <span><b>淨重:</b> ${meta.grandTotalNetWeight} ${unitLabel}</span>
+            <span><b>水重:</b> ${meta.waterDeductionFactor}</span>
+          </div>
+          <div class="summary-grid" style="margin-top: 4px;">
+            <span><b>已扣水重:</b> ${meta.grandTotalWaterWeight} ${unitLabel}</span>
             <span><b>單價:</b> $${meta.unitPrice} / ${unitLabel}</span>
+            <span></span>
           </div>
           <div class="price-row">
             <span>總金額 (Final Price):</span>
-            <span>$${meta.grandTotalFinalPrice.toFixed(2)}</span>
+            <span>$${meta.grandTotalFinalPrice}</span>
           </div>
         </div>
       </body>
@@ -196,13 +199,13 @@ export const exportToPdf = async (
       // 1. Web Download Strategy
       const blob = new Blob([htmlContent], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = url;
       link.download = `稱重單據_${meta.date || 'export'}.html`;
       document.body.appendChild(link);
       link.click();
-      
+
       // Cleanup
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
