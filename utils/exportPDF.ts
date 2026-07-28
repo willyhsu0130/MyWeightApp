@@ -82,6 +82,7 @@ export const exportToPdf = async (
     <html>
       <head>
         <meta charset="utf-8" />
+        <title>晁欣漁產稱重單據</title>
         <style>
           @page { margin: 10mm; }
           body { 
@@ -192,8 +193,21 @@ export const exportToPdf = async (
 
   try {
     if (Platform.OS === 'web') {
-      await Print.printAsync({ html: htmlContent });
+      // 1. Web Download Strategy
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `稱重單據_${meta.date || 'export'}.html`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } else {
+      // 2. Native Mobile Strategy (iOS / Android)
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
 
       if (await Sharing.isAvailableAsync()) {

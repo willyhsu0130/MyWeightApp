@@ -15,12 +15,13 @@ import {
   Platform,
 } from 'react-native';
 import { Card } from 'react-native-paper';
-
+import { truncateDecimals } from '@/utils/truncateDecimals';
 // Native File System & Sharing
 import { exportToSpreadsheet } from '@/utils/exportCSV';
 import { exportToPdf } from '@/utils/exportPDF';
 
 type WeightUnit = 'jin' | 'kg';
+
 
 // Type-annotated INITIAL_BATCHES
 const INITIAL_BATCHES: Batch[] = [
@@ -92,7 +93,9 @@ export default function App() {
   );
   const grandTotalCount = batches.reduce((acc, b) => acc + b.items.length, 0);
   const grandTotalNetWeight = grandTotalSum - grandTotalCount * currentBasketWeight;
-  const grandTotalWaterWeight = grandTotalNetWeight * currentDeductionFactor;
+
+  // Truncate grand total water weight to 2 decimal places without rounding up
+  const grandTotalWaterWeight = truncateDecimals(grandTotalNetWeight * currentDeductionFactor, 2);
   const grandTotalFinalPrice = grandTotalWaterWeight * currentUnitPrice;
 
   const maxRows = Math.max(...batches.map((b) => b.items.length), 0);
@@ -110,7 +113,7 @@ export default function App() {
     };
     setBatches([...batches, newBatch]);
     setActiveBatchId(newId);
-    focusWeightInput()
+    focusWeightInput();
   };
 
   // --- 刪除批次 Confirmation & Handler ---
@@ -161,7 +164,15 @@ export default function App() {
       );
       setInput('');
     }
-    focusWeightInput()
+    focusWeightInput();
+  };
+
+  const handleInputSubmit = () => {
+    if (input.trim() === '') {
+      addBatch();
+    } else {
+      addNumber();
+    }
   };
 
   const saveEdit = (itemId: number) => {
@@ -294,227 +305,237 @@ export default function App() {
         <View style={styles.body}>
           {/* 主要作業區 */}
           <View style={styles.mainArea}>
-            <Card style={styles.inputCard}>
-              {/* 單位切換鈕 (台斤 / 公斤) */}
-              <View style={styles.unitToggleContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.unitBtn,
-                    unit === 'jin' && styles.activeUnitBtn,
-                  ]}
-                  onPress={() => setUnit('jin')}
-                >
-                  <Text
+            <View>
+              <Card style={styles.inputCard}>
+                {/* 單位切換鈕 (台斤 / 公斤) */}
+                <View style={styles.unitToggleContainer}>
+                  <TouchableOpacity
                     style={[
-                      styles.unitBtnText,
-                      unit === 'jin' && styles.activeUnitBtnText,
+                      styles.unitBtn,
+                      unit === 'jin' && styles.activeUnitBtn,
                     ]}
+                    onPress={() => setUnit('jin')}
                   >
-                    台斤
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.unitBtn,
-                    unit === 'kg' && styles.activeUnitBtn,
-                  ]}
-                  onPress={() => setUnit('kg')}
-                >
-                  <Text
+                    <Text
+                      style={[
+                        styles.unitBtnText,
+                        unit === 'jin' && styles.activeUnitBtnText,
+                      ]}
+                    >
+                      台斤
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={[
-                      styles.unitBtnText,
-                      unit === 'kg' && styles.activeUnitBtnText,
+                      styles.unitBtn,
+                      unit === 'kg' && styles.activeUnitBtn,
                     ]}
+                    onPress={() => setUnit('kg')}
                   >
-                    公斤
+                    <Text
+                      style={[
+                        styles.unitBtnText,
+                        unit === 'kg' && styles.activeUnitBtnText,
+                      ]}
+                    >
+                      公斤
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={Platform.OS === "ios" ? styles.headingWrapperMobile : styles.headingWrapper}>
+                  <Text style={styles.heading}>
+                    {getBatchName(safeActiveIndex)} - 輸入數值
                   </Text>
+                </View>
+
+                {/* 第一行：重量輸入框 + 加入按鈕 */}
+                <View style={styles.inputRow}>
+                  <TextInput
+                    ref={weightInputRef}
+                    style={styles.textInput}
+                    placeholder={`請輸入重量 (${unitLabel})`}
+                    placeholderTextColor="#7f8c8d"
+                    value={input}
+                    onChangeText={setInput}
+                    keyboardType="numeric"
+                    onSubmitEditing={handleInputSubmit}
+                  />
+                  <View style={styles.addBtnWrapper}>
+                    <Button title="加入" onPress={addNumber} />
+                  </View>
+                </View>
+
+                {/* 第二行：籃重、水重、單價設定區 */}
+                <View style={Platform.OS === "ios" ? styles.settingsContainerMobile : styles.settingsContainer}>
+                  <View style={styles.settingItem}>
+                    <Text style={styles.settingLabel}>籃重 ({unitLabel}):</Text>
+                    <TextInput
+                      style={styles.settingInput}
+                      placeholder="籃重"
+                      placeholderTextColor="#7f8c8d"
+                      value={basketWeight}
+                      onChangeText={setBasketWeight}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.settingItem}>
+                    <Text style={styles.settingLabel}>水重:</Text>
+                    <TextInput
+                      style={styles.settingInput}
+                      placeholder="0.975"
+                      placeholderTextColor="#7f8c8d"
+                      value={waterDeductionFactor}
+                      onChangeText={setWaterDeductionFactor}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.settingItem}>
+                    <Text style={styles.settingLabel}>單價 ($/{unitLabel}):</Text>
+                    <TextInput
+                      style={styles.settingInput}
+                      placeholder="單價"
+                      placeholderTextColor="#7f8c8d"
+                      value={unitPrice}
+                      onChangeText={setUnitPrice}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {/* 第三行：最底部的刪除批次按鈕 */}
+                <TouchableOpacity
+                  style={styles.deleteBatchBtn}
+                  onPress={() => confirmDeleteBatch(activeBatch.id)}
+                >
+                  <Text style={styles.deleteBatchBtnText}>刪除此批次</Text>
                 </TouchableOpacity>
-              </View>
-              <View style={Platform.OS === "ios" ? styles.headingWrapperMobile : styles.headingWrapper}>
-                <Text style={styles.heading}>
-                  {getBatchName(safeActiveIndex)} - 輸入數值
-                </Text>
-
-
-              </View>
-
-              {/* 第一行：重量輸入框 + 加入按鈕 */}
-              <View style={styles.inputRow}>
-                <TextInput
-                  ref={weightInputRef}
-                  style={styles.textInput}
-                  placeholder={`請輸入重量 (${unitLabel})`}
-                  placeholderTextColor="#7f8c8d"
-                  value={input}
-                  onChangeText={setInput}
-                  keyboardType="numeric"
-                  onSubmitEditing={addNumber}
-                />
-                <View style={styles.addBtnWrapper}>
-                  <Button title="加入" onPress={addNumber} />
-                </View>
-              </View>
-
-              {/* 第二行：籃重、水重、單價設定區 */}
-              <View style={Platform.OS === "ios" ? styles.settingsContainerMobile : styles.settingsContainer}>
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>籃重 ({unitLabel}):</Text>
-                  <TextInput
-                    style={styles.settingInput}
-                    placeholder="籃重"
-                    placeholderTextColor="#7f8c8d"
-                    value={basketWeight}
-                    onChangeText={setBasketWeight}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>水重:</Text>
-                  <TextInput
-                    style={styles.settingInput}
-                    placeholder="0.975"
-                    placeholderTextColor="#7f8c8d"
-                    value={waterDeductionFactor}
-                    onChangeText={setWaterDeductionFactor}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>單價 ($/{unitLabel}):</Text>
-                  <TextInput
-                    style={styles.settingInput}
-                    placeholder="單價"
-                    placeholderTextColor="#7f8c8d"
-                    value={unitPrice}
-                    onChangeText={setUnitPrice}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
-              {/* 第三行：最底部的刪除批次按鈕 */}
-              <TouchableOpacity
-                style={styles.deleteBatchBtn}
-                onPress={() => confirmDeleteBatch(activeBatch.id)}
-              >
-                <Text style={styles.deleteBatchBtnText}>刪除此批次</Text>
-              </TouchableOpacity>
-            </Card>
-
-            {/* 當前批次統計 */}
-            <Text style={styles.sectionTitle}>
-              當前批次統計 ({getBatchName(safeActiveIndex)})
-            </Text>
-            <View style={styles.statsContainer}>
-              <View style={styles.statsRow}>
-                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#3498db' }]}>
-                  <Text style={styles.statLabel}>總和 ({unitLabel})</Text>
-                  <Text style={[styles.statValue, { color: '#2980b9' }]}>
-                    {currentSum.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
-                  </Text>
-                </Card>
-
-                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#9b59b6' }]}>
-                  <Text style={styles.statLabel}>籃數 (筆數)</Text>
-                  <Text style={[styles.statValue, { color: '#8e44ad' }]}>
-                    {currentCount} <Text style={styles.unitText}>籃</Text>
-                  </Text>
-                </Card>
-              </View>
-
-              <View style={styles.statsRow}>
-                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#2ecc71' }]}>
-                  <View style={Platform.OS === "ios" ? styles.labelWithSubMobile : styles.labelWithSub}>
-                    <Text style={styles.statLabel}>淨重 ({unitLabel})</Text>
-                    <Text style={styles.subFormula}>(總和 - 籃數×{currentBasketWeight})</Text>
-                  </View>
-                  <Text style={[styles.statValue, { color: '#27ae60' }]}>
-                    {currentNetWeight.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
-                  </Text>
-                </Card>
-
-                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#e67e22' }]}>
-                  <View style={Platform.OS === "ios" ? styles.labelWithSubMobile : styles.labelWithSub}>
-                    <Text style={styles.statLabel}>已扣水重 ({unitLabel})</Text>
-                    <Text style={styles.subFormula}>(淨重 × {currentDeductionFactor})</Text>
-                  </View>
-                  <Text style={[styles.statValue, { color: '#d35400' }]}>
-                    {currentWaterWeight.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
-                  </Text>
-                </Card>
-              </View>
-
-              {/* 最終總金額卡片 */}
-              <Card style={[styles.statBox, { borderLeftColor: '#f1c40f', backgroundColor: '#fef9e7' }]}>
-                <View style={styles.labelWithSub}>
-                  <Text style={[styles.statLabel, { color: '#b7950b', fontWeight: 'bold' }]}>
-                    金額 (Final Amount)
-                  </Text>
-                  <Text style={[styles.subFormula, { color: '#d4ac0d' }]}>
-                    (已扣水重 × ${currentUnitPrice})
-                  </Text>
-                </View>
-                <Text style={[styles.statValue, { color: '#b7950b' }]}>
-                  ${currentFinalPrice.toFixed(2)}
-                </Text>
               </Card>
+
+              {/* 當前批次統計 */}
+              <Text style={styles.sectionTitle}>
+                當前批次統計 ({getBatchName(safeActiveIndex)})
+              </Text>
+              <View style={styles.statsContainer}>
+                <View style={styles.statsRow}>
+                  <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#3498db' }]}>
+                    <Text style={styles.statLabel}>總和 ({unitLabel})</Text>
+                    <Text style={[styles.statValue, { color: '#2980b9' }]}>
+                      {currentSum.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
+                    </Text>
+                  </Card>
+
+                  <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#9b59b6' }]}>
+                    <Text style={styles.statLabel}>籃數 (筆數)</Text>
+                    <Text style={[styles.statValue, { color: '#8e44ad' }]}>
+                      {currentCount} <Text style={styles.unitText}>籃</Text>
+                    </Text>
+                  </Card>
+                </View>
+
+                <View style={styles.statsRow}>
+                  <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#2ecc71' }]}>
+                    <View style={Platform.OS === "ios" ? styles.labelWithSubMobile : styles.labelWithSub}>
+                      <Text style={styles.statLabel}>淨重 ({unitLabel})</Text>
+                      <Text style={styles.subFormula}>(總和 - 籃數×{currentBasketWeight})</Text>
+                    </View>
+                    <Text style={[styles.statValue, { color: '#27ae60' }]}>
+                      {currentNetWeight.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
+                    </Text>
+                  </Card>
+
+                  <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#e67e22' }]}>
+                    <View style={Platform.OS === "ios" ? styles.labelWithSubMobile : styles.labelWithSub}>
+                      <Text style={styles.statLabel}>已扣水重 ({unitLabel})</Text>
+                      <Text style={styles.subFormula}>(淨重 × {currentDeductionFactor})</Text>
+                    </View>
+                    <Text style={[styles.statValue, { color: '#d35400' }]}>
+                      {currentWaterWeight.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
+                    </Text>
+                  </Card>
+                </View>
+
+                {/* 最終總金額卡片 */}
+                <Card style={[styles.statBox, { borderLeftColor: '#f1c40f', backgroundColor: '#fef9e7' }]}>
+                  <View style={styles.labelWithSub}>
+                    <Text style={[styles.statLabel, { color: '#b7950b', fontWeight: 'bold' }]}>
+                      金額 (Final Amount)
+                    </Text>
+                    <Text style={[styles.subFormula, { color: '#d4ac0d' }]}>
+                      (已扣水重 × ${currentUnitPrice})
+                    </Text>
+                  </View>
+                  <Text style={[styles.statValue, { color: '#b7950b' }]}>
+                    ${currentFinalPrice.toFixed(2)}
+                  </Text>
+                </Card>
+              </View>
             </View>
 
             {/* 全域總計列 & 匯出按鈕 */}
-            <Card style={styles.grandTotalCard}>
-              <Text style={styles.grandTotalTitle}>所有批次總計 (Grand Total) - {unitTextFull}</Text>
+            <View style={styles.grandTotalCard} id="grandTotalCard">
+              <Text style={styles.grandTotalTitle}>
+                所有批次總計 (Grand Total) - {unitTextFull}
+              </Text>
 
-              {/* 魚資訊預覽 */}
-              {exportFarmer || exportOrigin || exportDriver ? (
-                <View style={styles.fishInfoPreview}>
-                  <Text style={styles.fishInfoPreviewText}>
-                    👤 {exportFarmer || '無'} | 📍 {exportOrigin || '無'} | 🚗 {exportDriver || '無'}
-                  </Text>
+              {/* Main Horizontal Content Area */}
+              <View style={styles.cardContentRow}>
+
+                {/* Left Side: Dominant Info Area */}
+                <View style={styles.fContainer} id="fContainer">
+                  {/* 魚資訊預覽 */}
+                  {exportFarmer || exportOrigin || exportDriver ? (
+                    <View style={styles.fishInfoPreview}>
+                      <Text style={styles.fishInfoPreviewText}>
+                        👤 {exportFarmer || '無'} | 📍 {exportOrigin || '無'} | 🚗 {exportDriver || '無'}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.grandTotalRow}>
+                    <Text style={styles.grandTotalText}>
+                      總和: <Text style={styles.bold}>{grandTotalSum.toFixed(2)} {unitLabel}</Text>
+                    </Text>
+                    <Text style={styles.grandTotalText}>
+                      總籃數: <Text style={styles.bold}>{grandTotalCount} 籃</Text>
+                    </Text>
+                    <Text style={styles.grandTotalText}>
+                      總淨重: <Text style={styles.bold}>{grandTotalNetWeight.toFixed(2)} {unitLabel}</Text>
+                    </Text>
+                    <Text style={styles.grandTotalText}>
+                      總已扣水重: <Text style={styles.bold}>{grandTotalWaterWeight.toFixed(0)} {unitLabel}</Text>
+                    </Text>
+                    <Text style={[styles.grandTotalText, { color: '#f1c40f', fontWeight: 'bold' }]}>
+                      總金額: <Text style={styles.bold}>${grandTotalFinalPrice.toFixed(2)}</Text>
+                    </Text>
+                  </View>
                 </View>
-              ) : null}
 
-              <View style={styles.grandTotalRow}>
-                <Text style={styles.grandTotalText}>
-                  總和: <Text style={styles.bold}>{grandTotalSum.toFixed(2)} {unitLabel}</Text>
-                </Text>
-                <Text style={styles.grandTotalText}>
-                  總籃數: <Text style={styles.bold}>{grandTotalCount} 籃</Text>
-                </Text>
-                <Text style={styles.grandTotalText}>
-                  總淨重: <Text style={styles.bold}>{grandTotalNetWeight.toFixed(2)} {unitLabel}</Text>
-                </Text>
-                <Text style={styles.grandTotalText}>
-                  總已扣水重: <Text style={styles.bold}>{grandTotalWaterWeight.toFixed(2)} {unitLabel}</Text>
-                </Text>
-                <Text style={[styles.grandTotalText, { color: '#f1c40f', fontWeight: 'bold' }]}>
-                  總金額: <Text style={styles.bold}>${grandTotalFinalPrice.toFixed(2)}</Text>
-                </Text>
+                {/* Right Side: Action Buttons Column */}
+                <View style={styles.actionColumn}>
+                  <TouchableOpacity
+                    style={styles.fishInfoBtn}
+                    onPress={openFishInfoModal}
+                  >
+                    <Text style={styles.fishInfoBtnText}>魚資訊</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.exportBtn}
+                    onPress={handleExport}
+                  >
+                    <Text style={styles.exportBtnText}>匯出報表</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.viewAllBtn}
+                    onPress={() => setShowAllHistory(true)}
+                  >
+                    <Text style={styles.viewAllBtnText}>總明細</Text>
+                  </TouchableOpacity>
+                </View>
+
               </View>
-
-              {/* 三按鈕：填寫魚資訊 / 匯出報表 / 查看總明細 */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={styles.fishInfoBtn}
-                  onPress={openFishInfoModal}
-                >
-                  <Text style={styles.fishInfoBtnText}>魚資訊</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.exportBtn}
-                  onPress={handleExport}
-                >
-                  <Text style={styles.exportBtnText}>匯出報表</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.viewAllBtn}
-                  onPress={() => setShowAllHistory(true)}
-                >
-                  <Text style={styles.viewAllBtnText}>總明細</Text>
-                </TouchableOpacity>
-              </View>
-            </Card>
+            </View>
           </View>
 
           {/* 右側：當前批次歷史紀錄 */}
@@ -802,7 +823,7 @@ export default function App() {
                     {/* Summary Row 4: Water Weight */}
                     <View style={[styles.excelRow, styles.summaryRow]}>
                       <View style={[styles.excelCell, styles.summaryLabelCell]}>
-                        <Text style={styles.summaryLabelText}>水重</Text>
+                        <Text style={styles.summaryLabelText}>已扣水重</Text>
                       </View>
                       {batches.map((b) => {
                         const sum = b.items.reduce(
@@ -995,8 +1016,8 @@ export default function App() {
             </View>
           </View>
         </Modal>
-      </View >
-    </SafeAreaView >
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -1163,14 +1184,14 @@ const styles = StyleSheet.create({
   },
   settingsContainerMobile: {
     flexDirection: 'row',
-    flexWrap: 'wrap', // Enable wrapping onto new lines
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'flex-start', // Keeps wrapped items left-aligned (or 'space-between' if you prefer)
+    justifyContent: 'flex-start',
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f0f3f4',
-    gap: 8, // Controls spacing between wrapped rows & items
+    gap: 8,
   },
   settingItem: {
     flexDirection: 'row',
@@ -1241,12 +1262,22 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#2c3e50',
     borderRadius: 8,
+    flex: 1,
   },
   grandTotalTitle: {
     color: '#f1c40f',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: 'bold',
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  cardContentRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  fContainer: {
+    flex: 3,
+    justifyContent: 'space-between',
   },
   fishInfoPreview: {
     backgroundColor: 'rgba(39, 174, 96, 0.15)',
@@ -1262,26 +1293,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   grandTotalRow: {
+    flex: 1,
     flexDirection: 'column',
-    gap: 4,
-    marginBottom: 12,
+    justifyContent: "space-evenly",
   },
   grandTotalText: {
     color: '#ecf0f1',
-    fontSize: 13,
+    fontSize: Platform.select({
+      ios: 13,
+      web: 15,
+      default: 13,
+    }),
   },
   bold: {
     fontWeight: 'bold',
     color: '#ffffff',
   },
-  actionRow: {
-    flexDirection: 'row',
+  actionColumn: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
     gap: 6,
+    flex: 2
   },
   fishInfoBtn: {
-    flex: 1.1,
+    flex: 1,
     backgroundColor: '#e67e22',
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1292,9 +1330,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   exportBtn: {
-    flex: 1.2,
+    flex: 1,
     backgroundColor: '#27ae60',
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1307,7 +1346,8 @@ const styles = StyleSheet.create({
   viewAllBtn: {
     flex: 1,
     backgroundColor: '#34495e',
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
