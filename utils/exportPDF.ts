@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Alert, Platform } from 'react-native';
+import { File, Paths } from 'expo-file-system';
 
 export interface BatchItem {
   id: number;
@@ -226,15 +227,26 @@ export const exportToPdf = async (
       };
     } else {
       // Native Mobile Strategy (iOS / Android)
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      const { uri: tempUri } = await Print.printToFileAsync({ html: htmlContent });
 
+      // 1. Point to the temporary PDF created by Print
+      const tempFile = new File(tempUri);
+
+      // 2. Define the destination file inside the cache directory with custom filename
+      const destinationFile = new File(Paths.cache, fileName);
+
+      // 3. Copy the file
+      tempFile.copy(destinationFile);
+
+      // 4. Share using the new file's URI
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
+        await Sharing.shareAsync(destinationFile.uri, {
           mimeType: 'application/pdf',
           dialogTitle: '列印 / 分享 PDF 稱重單據',
+          UTI: 'com.adobe.pdf',
         });
       } else {
-        Alert.alert('PDF 已產生', `檔案位置: ${uri}`);
+        Alert.alert('PDF 已產生', `檔案位置: ${destinationFile.uri}`);
       }
     }
   } catch (error) {

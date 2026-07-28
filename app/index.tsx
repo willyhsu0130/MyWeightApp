@@ -1,5 +1,5 @@
 import type { Batch } from "@/types/weight";
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -282,6 +282,24 @@ export default function App() {
       );
     }
   };
+
+  // useEffect(() => {
+  //   if (Platform.OS !== 'web') return;
+  //   // Check if user has entered any weight items across all batches
+  //   const hasData = batches.some((b) => b.items.length > 0);
+  //   const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  //     if (hasData) {
+  //       // Standard Web API way to trigger browser default confirmation dialog
+  //       event.preventDefault();
+  //       event.returnValue = ''; // Required for Chrome / modern browsers
+  //       return '';
+  //     }
+  //   };
+  //   window.addEventListener('beforeunload', handleBeforeUnload);
+  //   return () => {
+  //     window.removeEventListener('beforeunload', handleBeforeUnload);
+  //   };
+  // }, [batches]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
