@@ -45,6 +45,7 @@ export const exportToPdf = async (
   // Always render at least 25 rows to match physical sheet height
   const maxRows = Math.max(25, ...batches.map((b) => b.items.length));
   const unitLabel = meta.unit === '台斤' ? '台斤' : '公斤';
+  const fileName = `稱重單據_${meta.farmer || '明細'}_${meta.date || 'Export'}.pdf`;
 
   // 1. Column Headers (Batch 1, 2, 3...)
   const columnHeadersHtml = Array.from(
@@ -86,7 +87,7 @@ export const exportToPdf = async (
     <html>
       <head>
         <meta charset="utf-8" />
-        <title>晁欣漁產稱重單據</title>
+        <title>${fileName.replace('.pdf', '')}</title>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
