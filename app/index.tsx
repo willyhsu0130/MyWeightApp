@@ -120,32 +120,34 @@ export default function App() {
     const targetIndex = batches.findIndex((b) => b.id === batchIdToDelete);
     const batchName = getBatchName(targetIndex !== -1 ? targetIndex : safeActiveIndex);
 
-    Alert.alert(
-      '確認刪除批次',
-      `您確定要刪除「${batchName}」及其所有紀錄嗎？此動作無法復原。`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '刪除',
-          style: 'destructive',
-          onPress: () => {
-            if (batches.length <= 1) {
-              const newId = Date.now();
-              setBatches([{ id: newId, items: [] }]);
-              setActiveBatchId(newId);
-              return;
-            }
+    if (Platform.OS === "ios") {
+      Alert.alert(
+        '確認刪除批次',
+        `您確定要刪除「${batchName}」及其所有紀錄嗎？此動作無法復原。`,
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '刪除',
+            style: 'destructive',
+            onPress: () => {
+              if (batches.length <= 1) {
+                const newId = Date.now();
+                setBatches([{ id: newId, items: [] }]);
+                setActiveBatchId(newId);
+                return;
+              }
 
-            const updatedBatches = batches.filter((b) => b.id !== batchIdToDelete);
-            setBatches(updatedBatches);
+              const updatedBatches = batches.filter((b) => b.id !== batchIdToDelete);
+              setBatches(updatedBatches);
 
-            if (activeBatchId === batchIdToDelete) {
-              setActiveBatchId(updatedBatches[0].id);
-            }
+              if (activeBatchId === batchIdToDelete) {
+                setActiveBatchId(updatedBatches[0].id);
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const addNumber = () => {
@@ -248,25 +250,37 @@ export default function App() {
       grandTotalFinalPrice,
     };
 
-    Alert.alert(
-      '選擇匯出格式',
-      '請選擇您要產生的報表格式：',
-      [
-        {
-          text: 'PDF 報表 (列印/分享)',
-          onPress: () => exportToPdf(batches, metadata),
-        },
-        {
-          text: 'Excel / CSV 試算表',
-          onPress: () => exportToSpreadsheet(batches, metadata),
-        },
-        {
-          text: '取消',
-          style: 'cancel',
-        },
-      ],
-      { cancelable: true }
-    );
+    if (Platform.OS === "web") {
+      // Prompt user to pick PDF or CSV on web
+      const isPdf = window.confirm(
+        "請選擇匯出格式：\n\n按下 [確定] 匯出 PDF 報表\n按下 [取消] 匯出 Excel / CSV 試算表"
+      );
+      if (isPdf) {
+        exportToPdf(batches, metadata);
+      } else {
+        exportToSpreadsheet(batches, metadata);
+      }
+    } else {
+      Alert.alert(
+        '選擇匯出格式',
+        '請選擇您要產生的報表格式：',
+        [
+          {
+            text: 'PDF 報表 (列印/分享)',
+            onPress: () => exportToPdf(batches, metadata),
+          },
+          {
+            text: 'Excel / CSV 試算表',
+            onPress: () => exportToSpreadsheet(batches, metadata),
+          },
+          {
+            text: '取消',
+            style: 'cancel',
+          },
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   return (
@@ -1029,6 +1043,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f4f6f7',
+    fontFamily: Platform.OS === 'web'
+      ? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", sans-serif'
+      : undefined,
   },
   topTabBar: {
     backgroundColor: '#ffffff',

@@ -33,7 +33,11 @@ export const exportToPdf = async (
   meta: ExportMetadata
 ) => {
   if (batches.every((b) => b.items.length === 0)) {
-    Alert.alert('提示', '目前沒有任何資料可供匯出');
+    if (Platform.OS === 'web') {
+      alert('提示：目前沒有任何資料可供匯出');
+    } else {
+      Alert.alert('提示', '目前沒有任何資料可供匯出');
+    }
     return;
   }
 
@@ -48,7 +52,7 @@ export const exportToPdf = async (
     (_, i) => `<th style="border: 1px solid #000; padding: 4px;">${i + 1}</th>`
   ).join('');
 
-  // 2. Grid Rows (1 to 25+) - Without Remarks Column
+  // 2. Grid Rows (1 to 25+)
   let dataRowsHtml = '';
   for (let r = 0; r < maxRows; r++) {
     const cellsHtml = batches
@@ -71,7 +75,8 @@ export const exportToPdf = async (
   const subtotalsHtml = batches
     .map((b) => {
       const sum = b.items.reduce((acc, curr) => acc + curr.val, 0);
-      return `<td style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 12px;">${sum > 0 ? sum.toFixed(1) : ''}</td>`;
+      return `<td style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 12px;">${sum > 0 ? sum.toFixed(1) : ''
+        }</td>`;
     })
     .join('');
 
@@ -85,7 +90,7 @@ export const exportToPdf = async (
         <style>
           @page { margin: 10mm; }
           body { 
-            font-family: system-ui, -apple-system, sans-serif; 
+           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", sans-serif;
             padding: 10px; 
             color: #000; 
             background: #fff;
@@ -186,7 +191,7 @@ export const exportToPdf = async (
             <span></span>
           </div>
           <div class="price-row">
-            <span>總金額 (Final Price):</span>
+            <span>總金額:</span>
             <span>$${meta.grandTotalFinalPrice}</span>
           </div>
         </div>
@@ -196,21 +201,27 @@ export const exportToPdf = async (
 
   try {
     if (Platform.OS === 'web') {
-      // 1. Web Download Strategy
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
+      // Modern Web Print strategy using off-screen iframe & srcdoc
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
 
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `稱重單據_${meta.date || 'export'}.html`;
-      document.body.appendChild(link);
-      link.click();
+      iframe.srcdoc = htmlContent;
+      document.body.appendChild(iframe);
 
-      // Cleanup
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      iframe.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          document.body.removeChild(iframe);
+        }, 200);
+      };
     } else {
-      // 2. Native Mobile Strategy (iOS / Android)
+      // Native Mobile Strategy (iOS / Android)
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
 
       if (await Sharing.isAvailableAsync()) {
@@ -223,7 +234,11 @@ export const exportToPdf = async (
       }
     }
   } catch (error) {
-    Alert.alert('PDF 產生失敗', '無法建立 PDF 檔案');
+    if (Platform.OS === 'web') {
+      alert('PDF 產生失敗，無法建立列印頁面');
+    } else {
+      Alert.alert('PDF 產生失敗', '無法建立 PDF 檔案');
+    }
     console.error(error);
   }
 };
