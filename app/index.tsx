@@ -21,20 +21,11 @@ import { exportToPdf } from '@/utils/exportPDF';
 
 type WeightUnit = 'jin' | 'kg';
 
-
-// Type-annotated INITIAL_BATCHES
-const INITIAL_BATCHES: Batch[] = [
-  {
-    id: Date.now(),
-    items: [],
-  },
-];
-
 export default function App() {
   const weightInputRef = useRef<TextInput>(null);
 
-  const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
-  const [activeBatchId, setActiveBatchId] = useState<number>(INITIAL_BATCHES[0].id);
+  const [batches, setBatches] = useState<Batch[]>(() => [{ id: Date.now(), items: [] }]);
+  const [activeBatchId, setActiveBatchId] = useState<number>(() => batches[0]?.id || Date.now());
 
   // Unit State (台斤 vs 公斤)
   const [unit, setUnit] = useState<WeightUnit>('jin');
@@ -1352,7 +1343,7 @@ const styles = StyleSheet.create({
   fishInfoBtn: {
     flex: 1,
     backgroundColor: '#e67e22',
-    paddingVertical: 8,
+    paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 6,
     alignItems: 'center',
@@ -1366,7 +1357,7 @@ const styles = StyleSheet.create({
   exportBtn: {
     flex: 1,
     backgroundColor: '#27ae60',
-    paddingVertical: 8,
+    paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 6,
     alignItems: 'center',
@@ -1380,7 +1371,7 @@ const styles = StyleSheet.create({
   viewAllBtn: {
     flex: 1,
     backgroundColor: '#34495e',
-    paddingVertical: 8,
+    paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 6,
     alignItems: 'center',
