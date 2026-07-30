@@ -1,5 +1,6 @@
 import type { Batch } from "@/types/weight";
 import React, { useEffect, useRef, useState } from 'react';
+import { StatsContainer } from "@/components/StatsContainer";
 import {
   Alert,
   Button,
@@ -438,61 +439,17 @@ export default function App() {
               當前批次統計 ({getBatchName(safeActiveIndex)})
             </Text>
 
-            <View style={styles.statsContainer}>
-              <View style={styles.statsRow}>
-                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#3498db' }]}>
-                  <Text style={styles.statLabel}>總和 ({unitLabel})</Text>
-                  <Text style={[styles.statValue, { color: '#2980b9' }]}>
-                    {currentSum.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
-                  </Text>
-                </Card>
-
-                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#9b59b6' }]}>
-                  <Text style={styles.statLabel}>籃數 (筆數)</Text>
-                  <Text style={[styles.statValue, { color: '#8e44ad' }]}>
-                    {currentCount} <Text style={styles.unitText}>籃</Text>
-                  </Text>
-                </Card>
-              </View>
-
-              <View style={styles.statsRow}>
-                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#2ecc71' }]}>
-                  <View style={Platform.OS === "ios" ? styles.labelWithSubMobile : styles.labelWithSub}>
-                    <Text style={styles.statLabel}>淨重 ({unitLabel})</Text>
-                    <Text style={styles.subFormula}>(總和 - 籃數×{currentBasketWeight})</Text>
-                  </View>
-                  <Text style={[styles.statValue, { color: '#27ae60' }]}>
-                    {currentNetWeight.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
-                  </Text>
-                </Card>
-
-                <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#e67e22' }]}>
-                  <View style={Platform.OS === "ios" ? styles.labelWithSubMobile : styles.labelWithSub}>
-                    <Text style={styles.statLabel}>已扣水重 ({unitLabel})</Text>
-                    <Text style={styles.subFormula}>(淨重 × {currentDeductionFactor})</Text>
-                  </View>
-                  <Text style={[styles.statValue, { color: '#d35400' }]}>
-                    {currentWaterWeight.toFixed(2)} <Text style={styles.unitText}>{unitLabel}</Text>
-                  </Text>
-                </Card>
-              </View>
-
-              {/* 最終總金額卡片 */}
-              <Card style={[styles.statBox, { borderLeftColor: '#f1c40f', backgroundColor: '#fef9e7' }]}>
-                <View style={styles.labelWithSub}>
-                  <Text style={[styles.statLabel, { color: '#b7950b', fontWeight: 'bold' }]}>
-                    金額 (Final Amount)
-                  </Text>
-                  <Text style={[styles.subFormula, { color: '#d4ac0d' }]}>
-                    (已扣水重 × ${currentUnitPrice})
-                  </Text>
-                </View>
-                <Text style={[styles.statValue, { color: '#b7950b' }]}>
-                  ${currentFinalPrice.toFixed(2)}
-                </Text>
-              </Card>
-            </View>
-
+            <StatsContainer
+              unitLabel={unitLabel}
+              currentSum={currentSum}
+              currentCount={currentCount}
+              currentBasketWeight={currentBasketWeight}
+              currentNetWeight={currentNetWeight}
+              currentDeductionFactor={currentDeductionFactor}
+              currentWaterWeight={currentWaterWeight}
+              currentUnitPrice={currentUnitPrice}
+              currentFinalPrice={currentFinalPrice}
+            />
 
             {/* 全域總計列 & 匯出按鈕 */}
             <View style={styles.grandTotalCard} id="grandTotalCard">
