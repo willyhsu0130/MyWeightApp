@@ -18,6 +18,7 @@ export interface StatsContainerProps {
     currentWaterWeight: number;
     currentUnitPrice: number;
     currentFinalPrice: number;
+    batchIndex: string;
 }
 
 export const StatsContainer: React.FC<StatsContainerProps> = ({
@@ -30,9 +31,13 @@ export const StatsContainer: React.FC<StatsContainerProps> = ({
     currentWaterWeight,
     currentUnitPrice,
     currentFinalPrice,
+    batchIndex
 }) => {
     return (
         <View style={styles.statsContainer}>
+            <Text style={styles.sectionTitle}>
+                當前批次統計 ({batchIndex})
+            </Text>
             <View style={styles.statsRow}>
                 <Card style={[styles.statBox, { flex: 1, borderLeftColor: '#3498db' }]}>
                     <Text style={styles.statLabel}>總和 ({unitLabel})</Text>
@@ -93,6 +98,7 @@ const styles = StyleSheet.create({
     statsContainer: {
         gap: 8,
         marginBottom: 12,
+        flex: 1
     },
     statsRow: {
         flexDirection: 'row',
@@ -133,5 +139,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'normal',
         color: '#7f8c8d',
+    },
+    sectionTitle: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#7f8c8d',
+        marginBottom: 6,
     },
 });

@@ -19,6 +19,7 @@ import { Card } from 'react-native-paper';
 // Native File System & Sharing
 import { exportToSpreadsheet } from '@/utils/exportCSV';
 import { exportToPdf } from '@/utils/exportPDF';
+import { GrandStatsContainer } from "@/components/GrandStatsContainer";
 
 type WeightUnit = 'jin' | 'kg';
 
@@ -434,61 +435,47 @@ export default function App() {
               </TouchableOpacity>
             </Card>
 
-            {/* 當前批次統計 */}
-            <Text style={styles.sectionTitle}>
-              當前批次統計 ({getBatchName(safeActiveIndex)})
-            </Text>
-
-            <StatsContainer
-              unitLabel={unitLabel}
-              currentSum={currentSum}
-              currentCount={currentCount}
-              currentBasketWeight={currentBasketWeight}
-              currentNetWeight={currentNetWeight}
-              currentDeductionFactor={currentDeductionFactor}
-              currentWaterWeight={currentWaterWeight}
-              currentUnitPrice={currentUnitPrice}
-              currentFinalPrice={currentFinalPrice}
-            />
+            {
+              Platform.OS === "web" &&
+              <StatsContainer
+                batchIndex={getBatchName(safeActiveIndex)}
+                unitLabel={unitLabel}
+                currentSum={currentSum}
+                currentCount={currentCount}
+                currentBasketWeight={currentBasketWeight}
+                currentNetWeight={currentNetWeight}
+                currentDeductionFactor={currentDeductionFactor}
+                currentWaterWeight={currentWaterWeight}
+                currentUnitPrice={currentUnitPrice}
+                currentFinalPrice={currentFinalPrice}
+              />
+            }
 
             {/* 全域總計列 & 匯出按鈕 */}
             <View style={styles.grandTotalCard} id="grandTotalCard">
-              <Text style={styles.grandTotalTitle}>
-                所有批次總計 (Grand Total) - {unitTextFull}
-              </Text>
 
               {/* Main Horizontal Content Area */}
               <View style={styles.cardContentRow}>
-
-                {/* Left Side: Dominant Info Area */}
-                <View style={styles.fContainer} id="fContainer">
-                  {/* 魚資訊預覽 */}
-                  {exportFarmer || exportOrigin || exportDriver ? (
+                {/* 魚資訊預覽 */}
+                {/* {exportFarmer || exportOrigin || exportDriver ? (
                     <View style={styles.fishInfoPreview}>
                       <Text style={styles.fishInfoPreviewText}>
                         👤 {exportFarmer || '無'} | 📍 {exportOrigin || '無'} | 🚗 {exportDriver || '無'}
                       </Text>
                     </View>
-                  ) : null}
-
-                  <View style={styles.grandTotalRow}>
-                    <Text style={styles.grandTotalText}>
-                      總和: <Text style={styles.bold}>{grandTotalSum} {unitLabel}</Text>
-                    </Text>
-                    <Text style={styles.grandTotalText}>
-                      總籃數: <Text style={styles.bold}>{grandTotalCount} 籃</Text>
-                    </Text>
-                    <Text style={styles.grandTotalText}>
-                      總淨重: <Text style={styles.bold}>{grandTotalNetWeight} {unitLabel}</Text>
-                    </Text>
-                    <Text style={styles.grandTotalText}>
-                      總已扣水重: <Text style={styles.bold}>{grandTotalWaterWeight} {unitLabel}</Text>
-                    </Text>
-                    <Text style={[styles.grandTotalText, { color: '#f1c40f', fontWeight: 'bold' }]}>
-                      總金額: <Text style={styles.bold}>${grandTotalFinalPrice}</Text>
-                    </Text>
-                  </View>
-                </View>
+                  ) : null} */}
+                {/* Left Side: Dominant Info Area */}
+                {Platform.OS === "web" && (
+                  <GrandStatsContainer
+                    unitLabel={unitLabel}
+                    grandTotalSum={grandTotalSum}
+                    grandTotalCount={grandTotalCount}
+                    grandTotalNetWeight={grandTotalNetWeight}
+                    grandTotalWaterWeight={grandTotalWaterWeight}
+                    grandTotalFinalPrice={grandTotalFinalPrice}
+                    unitTextFull={unitTextFull}
+                  />
+                )}
 
                 {/* Right Side: Action Buttons Column */}
                 <View style={styles.actionColumn}>
@@ -1132,19 +1119,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#7f8c8d',
-    marginBottom: 6,
-  },
   inputRow: {
+    flexWrap: "wrap",
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   textInput: {
-    flex: 1,
+    flex: 4,
+    minWidth: 140, // Pushes the button down if the row gets narrower than ~203px
     borderWidth: 1,
     borderColor: '#bdc3c7',
     borderRadius: 8,
@@ -1153,6 +1136,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   addBtnWrapper: {
+    flexGrow: 1,   // 👈 Expands to take the remaining width (or 100% when wrapped)
+    minWidth: 65,
     width: 65,
   },
   settingsContainer: {
@@ -1197,61 +1182,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: 55,
   },
-  statsContainer: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  statBox: {
-    padding: 10,
-    backgroundColor: '#ffffff',
-    borderLeftWidth: 5,
-    borderRadius: 8,
-  },
-  labelWithSub: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-  },
-  labelWithSubMobile: {
-    flexDirection: 'row',
-    flexWrap: "wrap",
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    fontWeight: '600',
-  },
-  subFormula: {
-    fontSize: 9,
-    color: '#bdc3c7',
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  unitText: {
-    fontSize: 12,
-    fontWeight: 'normal',
-    color: '#7f8c8d',
-  },
   grandTotalCard: {
     padding: 12,
     backgroundColor: '#2c3e50',
     borderRadius: 8,
     flex: 1,
-  },
-  grandTotalTitle: {
-    color: '#f1c40f',
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginBottom: 8,
   },
   cardContentRow: {
     flex: 1,
@@ -1274,23 +1209,6 @@ const styles = StyleSheet.create({
     color: '#2ecc71',
     fontSize: 12,
     fontWeight: '600',
-  },
-  grandTotalRow: {
-    flex: 1,
-    flexDirection: 'column',
-    justifyContent: "space-evenly",
-  },
-  grandTotalText: {
-    color: '#ecf0f1',
-    fontSize: Platform.select({
-      ios: 13,
-      web: 15,
-      default: 13,
-    }),
-  },
-  bold: {
-    fontWeight: 'bold',
-    color: '#ffffff',
   },
   actionColumn: {
     flexDirection: 'column',
