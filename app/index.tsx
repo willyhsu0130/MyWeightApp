@@ -1136,7 +1136,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   addBtnWrapper: {
-    flexGrow: 1,   // 👈 Expands to take the remaining width (or 100% when wrapped)
+    flexGrow: 1,
     minWidth: 65,
     width: 65,
   },
