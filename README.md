@@ -50,4 +50,4 @@ We may update our Privacy Policy from time to time. Any changes will be publishe
 If you have any questions about this Privacy Policy, please contact:
 
 * **Developer:** willyhsu0130
-* **Email:** [Your Email Address Here]
+* **Email:** willyhsu0130@gmail.com
