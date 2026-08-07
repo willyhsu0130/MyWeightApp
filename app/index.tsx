@@ -113,6 +113,22 @@ export default function App() {
     const targetIndex = batches.findIndex((b) => b.id === batchIdToDelete);
     const batchName = getBatchName(targetIndex !== -1 ? targetIndex : safeActiveIndex);
 
+    const performDelete = () => {
+      if (batches.length <= 1) {
+        const newId = Date.now();
+        setBatches([{ id: newId, items: [] }]);
+        setActiveBatchId(newId);
+        return;
+      }
+
+      const updatedBatches = batches.filter((b) => b.id !== batchIdToDelete);
+      setBatches(updatedBatches);
+
+      if (activeBatchId === batchIdToDelete) {
+        setActiveBatchId(updatedBatches[0].id);
+      }
+    };
+
     if (Platform.OS === "ios") {
       Alert.alert(
         '確認刪除批次',
@@ -122,24 +138,17 @@ export default function App() {
           {
             text: '刪除',
             style: 'destructive',
-            onPress: () => {
-              if (batches.length <= 1) {
-                const newId = Date.now();
-                setBatches([{ id: newId, items: [] }]);
-                setActiveBatchId(newId);
-                return;
-              }
-
-              const updatedBatches = batches.filter((b) => b.id !== batchIdToDelete);
-              setBatches(updatedBatches);
-
-              if (activeBatchId === batchIdToDelete) {
-                setActiveBatchId(updatedBatches[0].id);
-              }
-            },
+            onPress: performDelete,
           },
         ]
       );
+    } else {
+      const isConfirmed = window.confirm(
+        `確認刪除批次\n\n您確定要刪除「${batchName}」及其所有紀錄嗎？此動作無法復原。`
+      );
+      if (isConfirmed) {
+        performDelete();
+      }
     }
   };
 
